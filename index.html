@@ -1,0 +1,2253 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Synthetic Speech Detector</title>
+
+    <style>
+        /* =========================================================
+           GLOBAL
+        ========================================================= */
+
+        :root {
+            --bg: #111315;
+            --panel: #1b1e21;
+            --panel-dark: #151719;
+            --border: #30353a;
+
+            --text: #edf0f2;
+            --muted: #8f989f;
+
+            --accent: #d8a85a;
+            --good: #6bc28a;
+            --bad: #d96c6c;
+
+            --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+
+            background:
+                radial-gradient(
+                    circle at 50% -10%,
+                    #30353a 0%,
+                    #151719 38%,
+                    #0e1011 100%
+                );
+
+            color: var(--text);
+
+            font-family:
+                Inter,
+                ui-sans-serif,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
+        }
+
+        body::before {
+            content: "";
+
+            position: fixed;
+            inset: 0;
+
+            pointer-events: none;
+
+            opacity: 0.035;
+
+            background-image: url(
+                "data:image/svg+xml,%3Csvg width='140' height='140' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E"
+            );
+        }
+
+
+        /* =========================================================
+           MAIN CONTAINER
+        ========================================================= */
+
+        .shell {
+            width: 100%;
+            max-width: 1180px;
+
+            margin: auto;
+
+            padding: 34px 24px 54px;
+        }
+
+
+        /* =========================================================
+           HEADER
+        ========================================================= */
+
+        header {
+            display: flex;
+
+            align-items: center;
+            justify-content: space-between;
+
+            margin-bottom: 26px;
+        }
+
+        .brand {
+            display: flex;
+
+            align-items: center;
+
+            gap: 13px;
+        }
+
+        .logo {
+            width: 42px;
+            height: 42px;
+
+            border-radius: 12px;
+
+            display: grid;
+            place-items: center;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    #292d30,
+                    #111315
+                );
+
+            box-shadow:
+                inset 2px 2px 5px #3c4247,
+                inset -3px -3px 7px #090a0b,
+                0 5px 14px #080909;
+
+            color: var(--accent);
+
+            font-size: 25px;
+            font-weight: 900;
+        }
+
+        h1 {
+            margin: 0;
+
+            font-size: 21px;
+
+            letter-spacing: 0.2px;
+        }
+
+        .sub {
+            margin-top: 3px;
+
+            color: var(--muted);
+
+            font-size: 12px;
+        }
+
+        .status {
+            display: flex;
+
+            align-items: center;
+
+            gap: 8px;
+
+            padding: 9px 12px;
+
+            border: 1px solid var(--border);
+
+            border-radius: 999px;
+
+            background: #151719;
+
+            color: var(--muted);
+
+            font-size: 12px;
+
+            box-shadow:
+                inset 1px 1px 3px #080909;
+        }
+
+        .dot {
+            width: 7px;
+            height: 7px;
+
+            border-radius: 50%;
+
+            background: var(--good);
+
+            box-shadow:
+                0 0 10px rgba(107, 194, 138, 0.65);
+        }
+
+
+        /* =========================================================
+           LAYOUT
+        ========================================================= */
+
+        .grid {
+            display: grid;
+
+            grid-template-columns:
+                1.25fr
+                0.75fr;
+
+            gap: 18px;
+        }
+
+
+        /* =========================================================
+           CARDS
+        ========================================================= */
+
+        .card {
+            padding: 20px;
+
+            border: 1px solid var(--border);
+
+            border-radius: 18px;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    #1e2124,
+                    #17191b
+                );
+
+            box-shadow:
+                var(--shadow),
+                inset 1px 1px 0 rgba(255, 255, 255, 0.035);
+        }
+
+        .card-title {
+            display: flex;
+
+            align-items: center;
+            justify-content: space-between;
+
+            margin-bottom: 15px;
+        }
+
+        .card-title strong {
+            font-size: 13px;
+
+            letter-spacing: 0.8px;
+
+            text-transform: uppercase;
+        }
+
+        .hint {
+            color: var(--muted);
+
+            font-size: 11px;
+        }
+
+
+        /* =========================================================
+           DROP ZONE
+        ========================================================= */
+
+        .drop {
+            min-height: 180px;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            text-align: center;
+
+            cursor: pointer;
+
+            border: 1px dashed #555d63;
+
+            border-radius: 14px;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    #181b1d,
+                    #121415
+                );
+
+            box-shadow:
+                inset 0 4px 18px rgba(0, 0, 0, 0.35);
+
+            transition: 0.2s;
+        }
+
+        .drop:hover,
+        .drop.drag {
+            border-color: var(--accent);
+
+            transform: translateY(-1px);
+        }
+
+        .upload-icon {
+            margin-bottom: 9px;
+
+            color: var(--accent);
+
+            font-size: 31px;
+        }
+
+        .drop b {
+            display: block;
+
+            font-size: 14px;
+        }
+
+        .drop span {
+            display: block;
+
+            margin-top: 5px;
+
+            color: var(--muted);
+
+            font-size: 11px;
+        }
+
+
+        /* =========================================================
+           BUTTONS
+        ========================================================= */
+
+        .controls {
+            display: flex;
+
+            flex-wrap: wrap;
+
+            gap: 9px;
+
+            margin-top: 13px;
+        }
+
+        button {
+            padding: 10px 15px;
+
+            border: 1px solid #3a4045;
+
+            border-radius: 10px;
+
+            color: #e9ecee;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    #2a2e31,
+                    #1a1c1e
+                );
+
+            font-size: 12px;
+
+            font-weight: 700;
+
+            cursor: pointer;
+
+            box-shadow:
+                4px 4px 9px #0a0b0c,
+                inset 1px 1px 2px #454b50,
+                inset -1px -1px 2px #111;
+
+            transition: 0.12s;
+        }
+
+        button:hover {
+            filter: brightness(1.12);
+        }
+
+        button:active {
+            transform: translateY(1px);
+
+            box-shadow:
+                inset 2px 2px 5px #0b0c0d;
+        }
+
+        button.primary {
+            border-color: #e6bf7b;
+
+            color: #15110a;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    #e0b36a,
+                    #a87932
+                );
+        }
+
+        button:disabled {
+            opacity: 0.45;
+
+            cursor: not-allowed;
+        }
+
+
+        /* =========================================================
+           WAVEFORM
+        ========================================================= */
+
+        .wavebox {
+            display: none;
+
+            margin-top: 16px;
+
+            padding: 13px;
+
+            border: 1px solid #292e32;
+
+            border-radius: 12px;
+
+            background: #0b0d0e;
+
+            box-shadow:
+                inset 0 3px 14px #050606;
+        }
+
+        #wave {
+            display: block;
+
+            width: 100%;
+            height: 130px;
+
+            border-radius: 8px;
+        }
+
+        .meta {
+            display: flex;
+
+            justify-content: space-between;
+
+            margin-top: 8px;
+
+            color: var(--muted);
+
+            font-size: 11px;
+        }
+
+        .fileline {
+            overflow: hidden;
+
+            white-space: nowrap;
+
+            text-overflow: ellipsis;
+
+            color: #c9ced2;
+
+            font-size: 12px;
+        }
+
+
+        /* =========================================================
+           RESULT
+        ========================================================= */
+
+        .result {
+            display: flex;
+
+            min-height: 100%;
+
+            flex-direction: column;
+        }
+
+        .result-main {
+            padding: 24px;
+
+            border: 1px solid #2e3438;
+
+            border-radius: 14px;
+
+            text-align: center;
+
+            background: #111315;
+
+            box-shadow:
+                inset 0 5px 18px rgba(0, 0, 0, 0.4);
+        }
+
+        .badge {
+            margin: 3px 0 5px;
+
+            font-size: 27px;
+
+            font-weight: 900;
+
+            letter-spacing: 3px;
+        }
+
+        .conf {
+            color: var(--muted);
+
+            font-size: 12px;
+        }
+
+
+        /* =========================================================
+           CONFIDENCE METER
+        ========================================================= */
+
+        .meter {
+            height: 8px;
+
+            margin: 18px 0 10px;
+
+            overflow: hidden;
+
+            border-radius: 99px;
+
+            background: #090a0b;
+
+            box-shadow:
+                inset 0 2px 5px #000;
+        }
+
+        .fill {
+            width: 0%;
+
+            height: 100%;
+
+            background: var(--accent);
+
+            transition: 0.7s;
+        }
+
+
+        /* =========================================================
+           PROBABILITY ROWS
+        ========================================================= */
+
+        .rows {
+            display: grid;
+
+            gap: 10px;
+
+            margin-top: 18px;
+        }
+
+        .row {
+            display: grid;
+
+            grid-template-columns:
+                92px
+                1fr
+                48px;
+
+            align-items: center;
+
+            gap: 9px;
+
+            font-size: 11px;
+        }
+
+        .bar {
+            height: 7px;
+
+            overflow: hidden;
+
+            border-radius: 99px;
+
+            background: #0b0c0d;
+        }
+
+        .bar i {
+            display: block;
+
+            width: 0%;
+            height: 100%;
+
+            background: #aeb6bc;
+
+            transition: 0.6s;
+        }
+
+        .row b {
+            text-align: right;
+
+            color: #cbd0d4;
+
+            font-weight: 600;
+        }
+
+
+        /* =========================================================
+           MEL SPECTROGRAM
+        ========================================================= */
+
+        .specwrap {
+            display: none;
+
+            margin-top: 17px;
+        }
+
+        .specwrap canvas {
+            display: block;
+
+            width: 100%;
+            height: 170px;
+
+            border: 1px solid #2b3034;
+
+            border-radius: 10px;
+
+            background: #050606;
+
+            image-rendering: auto;
+        }
+
+
+        /* =========================================================
+           NOTE
+        ========================================================= */
+
+        .note {
+            margin-top: auto;
+
+            padding-top: 17px;
+
+            color: #747d84;
+
+            font-size: 10px;
+
+            line-height: 1.55;
+        }
+
+
+        /* =========================================================
+           ERROR
+        ========================================================= */
+
+        .error {
+            margin-top: 10px;
+
+            color: #f19a9a;
+
+            font-size: 11px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+
+        /* =========================================================
+           MOBILE
+        ========================================================= */
+
+        @media (max-width: 820px) {
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .shell {
+                padding: 22px 14px;
+            }
+
+            .status {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+
+<body>
+
+    <div class="shell">
+
+        <!-- =====================================================
+             HEADER
+        ====================================================== -->
+
+        <header>
+
+            <div class="brand">
+
+                <div class="logo">
+                    ∿
+                </div>
+
+                <div>
+
+                    <h1>
+                        Synthetic Speech Detector
+                    </h1>
+
+                    <div class="sub">
+                        AI-powered audio authenticity analysis
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="status">
+
+                <i class="dot"></i>
+
+                <span id="status">
+                    System ready
+                </span>
+
+            </div>
+
+        </header>
+
+
+        <!-- =====================================================
+             MAIN GRID
+        ====================================================== -->
+
+        <div class="grid">
+
+
+            <!-- =================================================
+                 AUDIO INPUT
+            ================================================== -->
+
+            <section class="card">
+
+                <div class="card-title">
+
+                    <strong>
+                        Audio input
+                    </strong>
+
+                    <span class="hint">
+                        WAV · MP3 · FLAC · OGG
+                    </span>
+
+                </div>
+
+
+                <!-- DROP AREA -->
+
+                <div id="drop" class="drop">
+
+                    <div>
+
+                        <div class="upload-icon">
+                            ↥
+                        </div>
+
+                        <b>
+                            Drop an audio file here
+                        </b>
+
+                        <span>
+                            or click to browse your device
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <!-- FILE INPUT -->
+
+                <input
+                    id="file"
+                    type="file"
+                    accept="audio/*"
+                    class="hidden"
+                >
+
+
+                <!-- =================================================
+                     WAVEFORM
+                ================================================== -->
+
+                <div id="wavebox" class="wavebox">
+
+                    <canvas id="wave"></canvas>
+
+                    <div class="meta">
+
+                        <span
+                            class="fileline"
+                            id="filename"
+                        >
+                            —
+                        </span>
+
+                        <span id="time">
+                            0:00 / 0:00
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <!-- =================================================
+                     CONTROLS
+                ================================================== -->
+
+                <div class="controls">
+
+                    <button id="choose">
+                        Choose audio
+                    </button>
+
+                    <button id="record">
+                        ● Record voice
+                    </button>
+
+                    <button
+                        id="play"
+                        disabled
+                    >
+                        ▶ Play
+                    </button>
+
+                    <button
+                        id="analyze"
+                        class="primary"
+                        disabled
+                    >
+                        Analyze audio
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="error"
+                    class="error"
+                ></div>
+
+            </section>
+
+
+            <!-- =================================================
+                 RESULT
+            ================================================== -->
+
+            <section class="card result">
+
+                <div class="card-title">
+
+                    <strong>
+                        Analysis result
+                    </strong>
+
+                    <span
+                        class="hint"
+                        id="duration"
+                    >
+                        —
+                    </span>
+
+                </div>
+
+
+                <!-- RESULT BOX -->
+
+                <div class="result-main">
+
+                    <div
+                        class="badge"
+                        id="prediction"
+                    >
+                        —
+                    </div>
+
+                    <div
+                        class="conf"
+                        id="confidence"
+                    >
+                        Upload or record audio to begin
+                    </div>
+
+
+                    <!-- CONFIDENCE -->
+
+                    <div class="meter">
+
+                        <div
+                            id="confidenceFill"
+                            class="fill"
+                        ></div>
+
+                    </div>
+
+
+                    <!-- PROBABILITIES -->
+
+                    <div class="rows">
+
+
+                        <!-- BONAFIDE -->
+
+                        <div class="row">
+
+                            <span>
+                                BONAFIDE
+                            </span>
+
+                            <div class="bar">
+
+                                <i
+                                    id="bonafideBar"
+                                ></i>
+
+                            </div>
+
+                            <b id="bonafide">
+                                —
+                            </b>
+
+                        </div>
+
+
+                        <!-- SPOOF -->
+
+                        <div class="row">
+
+                            <span>
+                                SPOOF
+                            </span>
+
+                            <div class="bar">
+
+                                <i
+                                    id="spoofBar"
+                                ></i>
+
+                            </div>
+
+                            <b id="spoof">
+                                —
+                            </b>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- =================================================
+                     MEL SPECTROGRAM
+                ================================================== -->
+
+                <div
+                    class="specwrap"
+                    id="specwrap"
+                >
+
+                    <div
+                        class="card-title"
+                        style="margin: 13px 0 8px"
+                    >
+
+                        <strong>
+                            Mel-spectrogram
+                        </strong>
+
+                        <span class="hint">
+                            model input representation
+                        </span>
+
+                    </div>
+
+
+                    <canvas id="spec"></canvas>
+
+                </div>
+
+
+                <!-- NOTE -->
+
+                <div class="note">
+
+                    This detector provides a model-based assessment.
+                    A result should be interpreted as an indication,
+                    not absolute proof of authenticity.
+
+                </div>
+
+            </section>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         JAVASCRIPT
+    ========================================================== -->
+
+    <script>
+
+        /* =========================================================
+           CONFIGURATION
+        ========================================================= */
+
+        const API = "http://127.0.0.1:8000";
+
+
+        /* =========================================================
+           DOM HELPER
+        ========================================================= */
+
+        function $(id) {
+            return document.getElementById(id);
+        }
+
+
+        /* =========================================================
+           GLOBAL STATE
+        ========================================================= */
+
+        let currentFile = null;
+
+        let audioUrl = null;
+
+        let audio = null;
+
+        let waveData = null;
+
+        let duration = 0;
+
+
+        /* =========================================================
+           RECORDING STATE
+        ========================================================= */
+
+        let recording = false;
+
+        let recordingStream = null;
+
+        let recordingContext = null;
+
+        let recordingProcessor = null;
+
+        let recordingSource = null;
+
+        let recordedSamples = [];
+
+
+        /* =========================================================
+           STATUS
+        ========================================================= */
+
+        function setStatus(message) {
+
+            $("status").textContent = message;
+
+        }
+
+
+        /* =========================================================
+           TIME FORMAT
+        ========================================================= */
+
+        function fmt(seconds) {
+
+            seconds = Number.isFinite(seconds)
+                ? Math.max(0, seconds)
+                : 0;
+
+            return (
+                Math.floor(seconds / 60)
+                + ":"
+                + String(
+                    Math.floor(seconds % 60)
+                ).padStart(2, "0")
+            );
+        }
+
+
+        /* =========================================================
+           RESET RESULT
+        ========================================================= */
+
+        function resetResult() {
+
+            $("prediction").textContent = "—";
+
+            $("prediction").style.color = "";
+
+            $("confidence").textContent =
+                "Ready to analyze";
+
+            $("confidenceFill").style.width = "0%";
+
+            $("bonafide").textContent = "—";
+
+            $("spoof").textContent = "—";
+
+            $("bonafideBar").style.width = "0%";
+
+            $("spoofBar").style.width = "0%";
+
+            $("specwrap").style.display = "none";
+
+            $("duration").textContent = "—";
+        }
+
+
+        /* =========================================================
+           DRAW WAVEFORM
+        ========================================================= */
+
+        function drawWaveform() {
+
+            const canvas = $("wave");
+
+            const dpr =
+                window.devicePixelRatio || 1;
+
+            const rect =
+                canvas.getBoundingClientRect();
+
+            if (!rect.width || !rect.height) {
+                return;
+            }
+
+            canvas.width =
+                rect.width * dpr;
+
+            canvas.height =
+                rect.height * dpr;
+
+            const ctx =
+                canvas.getContext("2d");
+
+            ctx.setTransform(
+                dpr,
+                0,
+                0,
+                dpr,
+                0,
+                0
+            );
+
+            ctx.clearRect(
+                0,
+                0,
+                rect.width,
+                rect.height
+            );
+
+            if (!waveData) {
+                return;
+            }
+
+            const middle =
+                rect.height / 2;
+
+            const progress =
+                audio &&
+                Number.isFinite(audio.duration) &&
+                audio.duration > 0
+                    ? audio.currentTime / audio.duration
+                    : 0;
+
+
+            for (
+                let x = 0;
+                x < rect.width;
+                x++
+            ) {
+
+                const start =
+                    Math.floor(
+                        x *
+                        waveData.length /
+                        rect.width
+                    );
+
+                const end =
+                    Math.max(
+                        start + 1,
+                        Math.min(
+                            waveData.length,
+                            Math.floor(
+                                (x + 1) *
+                                waveData.length /
+                                rect.width
+                            )
+                        )
+                    );
+
+
+                let minimum = 1;
+
+                let maximum = -1;
+
+
+                for (
+                    let i = start;
+                    i < end;
+                    i++
+                ) {
+
+                    minimum =
+                        Math.min(
+                            minimum,
+                            waveData[i]
+                        );
+
+                    maximum =
+                        Math.max(
+                            maximum,
+                            waveData[i]
+                        );
+                }
+
+
+                const height =
+                    Math.max(
+                        2,
+                        (maximum - minimum) *
+                        rect.height *
+                        0.88
+                    );
+
+
+                ctx.strokeStyle =
+                    x / rect.width < progress
+                        ? "#d8a85a"
+                        : "#68737a";
+
+                ctx.lineWidth = 1.2;
+
+
+                ctx.beginPath();
+
+                ctx.moveTo(
+                    x,
+                    middle - height / 2
+                );
+
+                ctx.lineTo(
+                    x,
+                    middle + height / 2
+                );
+
+                ctx.stroke();
+            }
+        }
+
+
+        /* =========================================================
+           LOAD AUDIO FILE
+        ========================================================= */
+
+        async function loadFile(file) {
+
+            if (!file) {
+                return;
+            }
+
+
+            $("error").textContent = "";
+
+
+            if (
+                !file.type.startsWith("audio/") &&
+                !/\.(wav|mp3|flac|m4a|ogg|webm|aac)$/i
+                    .test(file.name)
+            ) {
+
+                $("error").textContent =
+                    "Please select an audio file.";
+
+                return;
+            }
+
+
+            currentFile = file;
+
+
+            if (audioUrl) {
+
+                URL.revokeObjectURL(
+                    audioUrl
+                );
+            }
+
+
+            audioUrl =
+                URL.createObjectURL(file);
+
+
+            audio = new Audio();
+
+            audio.preload = "metadata";
+
+            audio.src = audioUrl;
+
+
+            $("filename").textContent =
+                file.name;
+
+            $("wavebox").style.display =
+                "block";
+
+            $("play").disabled = false;
+
+            $("analyze").disabled = false;
+
+            $("time").textContent =
+                "0:00 / 0:00";
+
+
+            resetResult();
+
+
+            /* AUDIO METADATA */
+
+            audio.onloadedmetadata = () => {
+
+                $("duration").textContent =
+                    fmt(audio.duration);
+
+                duration =
+                    audio.duration;
+
+                $("time").textContent =
+                    `0:00 / ${fmt(audio.duration)}`;
+            };
+
+
+            /* AUDIO PROGRESS */
+
+            audio.ontimeupdate = () => {
+
+                $("time").textContent =
+                    `${fmt(audio.currentTime)} / ${fmt(audio.duration)}`;
+
+                drawWaveform();
+            };
+
+
+            /* AUDIO END */
+
+            audio.onended = () => {
+
+                $("play").textContent =
+                    "▶ Play";
+
+                drawWaveform();
+            };
+
+
+            /* GET RAW AUDIO FOR WAVEFORM */
+
+            try {
+
+                const response =
+                    await fetch(audioUrl);
+
+                const buffer =
+                    await response.arrayBuffer();
+
+                const AudioContext =
+                    window.AudioContext ||
+                    window.webkitAudioContext;
+
+                const context =
+                    new AudioContext();
+
+                const decoded =
+                    await context.decodeAudioData(
+                        buffer.slice(0)
+                    );
+
+                waveData =
+                    decoded.getChannelData(0);
+
+                drawWaveform();
+
+                await context.close();
+
+            } catch (error) {
+
+                waveData = null;
+
+                drawWaveform();
+            }
+
+
+            setStatus("Audio loaded");
+        }
+
+
+        /* =========================================================
+           FILE SELECT
+        ========================================================= */
+
+        $("choose").onclick = () => {
+
+            $("file").click();
+
+        };
+
+
+        $("drop").onclick = () => {
+
+            $("file").click();
+
+        };
+
+
+        $("file").onchange = event => {
+
+            loadFile(
+                event.target.files[0]
+            );
+
+        };
+
+
+        /* =========================================================
+           DRAG AND DROP
+        ========================================================= */
+
+        [
+            "dragenter",
+            "dragover"
+        ].forEach(eventName => {
+
+            $("drop").addEventListener(
+                eventName,
+                event => {
+
+                    event.preventDefault();
+
+                    $("drop")
+                        .classList
+                        .add("drag");
+                }
+            );
+
+        });
+
+
+        [
+            "dragleave",
+            "drop"
+        ].forEach(eventName => {
+
+            $("drop").addEventListener(
+                eventName,
+                event => {
+
+                    event.preventDefault();
+
+                    $("drop")
+                        .classList
+                        .remove("drag");
+                }
+            );
+
+        });
+
+
+        $("drop").addEventListener(
+            "drop",
+            event => {
+
+                loadFile(
+                    event.dataTransfer.files[0]
+                );
+
+            }
+        );
+
+
+        /* =========================================================
+           PLAY / PAUSE
+        ========================================================= */
+
+        $("play").onclick = async () => {
+
+            if (!audio) {
+                return;
+            }
+
+
+            if (audio.paused) {
+
+                try {
+
+                    await audio.play();
+
+                    $("play").textContent =
+                        "Ⅱ Pause";
+
+                } catch (error) {
+
+                    $("error").textContent =
+                        "Unable to play this audio.";
+
+                }
+
+            } else {
+
+                audio.pause();
+
+                $("play").textContent =
+                    "▶ Play";
+            }
+        };
+
+
+        /* =========================================================
+           MICROPHONE RECORDING
+           
+           IMPORTANT:
+           This does NOT use MediaRecorder/WebM.
+
+           It captures raw PCM audio and creates
+           a real WAV file in the browser.
+        ========================================================= */
+
+        $("record").onclick = async () => {
+
+            if (recording) {
+
+                stopRecording();
+
+                return;
+            }
+
+
+            try {
+
+                recordingStream =
+                    await navigator.mediaDevices
+                        .getUserMedia({
+                            audio: true
+                        });
+
+
+                recordingContext =
+                    new (
+                        window.AudioContext ||
+                        window.webkitAudioContext
+                    )({
+                        sampleRate: 16000
+                    });
+
+
+                recordingSource =
+                    recordingContext
+                        .createMediaStreamSource(
+                            recordingStream
+                        );
+
+
+                recordingProcessor =
+                    recordingContext
+                        .createScriptProcessor(
+                            4096,
+                            1,
+                            1
+                        );
+
+
+                recordedSamples = [];
+
+
+                recordingProcessor
+                    .onaudioprocess =
+                    event => {
+
+                        const input =
+                            event.inputBuffer
+                                .getChannelData(0);
+
+                        recordedSamples.push(
+                            new Float32Array(input)
+                        );
+                    };
+
+
+                recordingSource.connect(
+                    recordingProcessor
+                );
+
+
+                recordingProcessor.connect(
+                    recordingContext.destination
+                );
+
+
+                recording = true;
+
+
+                $("record").textContent =
+                    "■ Stop recording";
+
+
+                setStatus(
+                    "Recording…"
+                );
+
+
+            } catch (error) {
+
+                $("error").textContent =
+                    "Microphone access was blocked or unavailable.";
+
+                setStatus(
+                    "Microphone unavailable"
+                );
+            }
+        };
+
+
+        /* =========================================================
+           STOP RECORDING
+        ========================================================= */
+
+        function stopRecording() {
+
+            recording = false;
+
+
+            if (recordingProcessor) {
+
+                recordingProcessor.disconnect();
+
+                recordingProcessor = null;
+            }
+
+
+            if (recordingSource) {
+
+                recordingSource.disconnect();
+
+                recordingSource = null;
+            }
+
+
+            if (recordingStream) {
+
+                recordingStream
+                    .getTracks()
+                    .forEach(track => {
+                        track.stop();
+                    });
+
+                recordingStream = null;
+            }
+
+
+            const samples =
+                mergeAudioSamples(
+                    recordedSamples
+                );
+
+
+            const wavBlob =
+                createWavBlob(
+                    samples,
+                    16000
+                );
+
+
+            const file =
+                new File(
+                    [wavBlob],
+                    "recording.wav",
+                    {
+                        type: "audio/wav"
+                    }
+                );
+
+
+            $("record").textContent =
+                "● Record voice";
+
+
+            loadFile(file);
+
+
+            setStatus(
+                "Recording ready"
+            );
+        }
+
+
+        /* =========================================================
+           MERGE RECORDED AUDIO
+        ========================================================= */
+
+        function mergeAudioSamples(chunks) {
+
+            let totalLength = 0;
+
+
+            for (const chunk of chunks) {
+
+                totalLength +=
+                    chunk.length;
+            }
+
+
+            const result =
+                new Float32Array(
+                    totalLength
+                );
+
+
+            let offset = 0;
+
+
+            for (const chunk of chunks) {
+
+                result.set(
+                    chunk,
+                    offset
+                );
+
+                offset +=
+                    chunk.length;
+            }
+
+
+            return result;
+        }
+
+
+        /* =========================================================
+           CREATE WAV FILE
+        ========================================================= */
+
+        function createWavBlob(
+            samples,
+            sampleRate
+        ) {
+
+            const buffer =
+                new ArrayBuffer(
+                    44 +
+                    samples.length * 2
+                );
+
+
+            const view =
+                new DataView(buffer);
+
+
+            /* RIFF */
+
+            writeString(
+                view,
+                0,
+                "RIFF"
+            );
+
+
+            view.setUint32(
+                4,
+                36 +
+                samples.length * 2,
+                true
+            );
+
+
+            writeString(
+                view,
+                8,
+                "WAVE"
+            );
+
+
+            /* FORMAT */
+
+            writeString(
+                view,
+                12,
+                "fmt "
+            );
+
+
+            view.setUint32(
+                16,
+                16,
+                true
+            );
+
+
+            /* PCM */
+
+            view.setUint16(
+                20,
+                1,
+                true
+            );
+
+
+            /* MONO */
+
+            view.setUint16(
+                22,
+                1,
+                true
+            );
+
+
+            /* SAMPLE RATE */
+
+            view.setUint32(
+                24,
+                sampleRate,
+                true
+            );
+
+
+            /* BYTE RATE */
+
+            view.setUint32(
+                28,
+                sampleRate * 2,
+                true
+            );
+
+
+            /* BLOCK ALIGNMENT */
+
+            view.setUint16(
+                32,
+                2,
+                true
+            );
+
+
+            /* BIT DEPTH */
+
+            view.setUint16(
+                34,
+                16,
+                true
+            );
+
+
+            /* DATA */
+
+            writeString(
+                view,
+                36,
+                "data"
+            );
+
+
+            view.setUint32(
+                40,
+                samples.length * 2,
+                true
+            );
+
+
+            /* AUDIO SAMPLES */
+
+            let offset = 44;
+
+
+            for (
+                let i = 0;
+                i < samples.length;
+                i++
+            ) {
+
+                let sample =
+                    Math.max(
+                        -1,
+                        Math.min(
+                            1,
+                            samples[i]
+                        )
+                    );
+
+
+                sample =
+                    sample < 0
+                        ? sample * 0x8000
+                        : sample * 0x7FFF;
+
+
+                view.setInt16(
+                    offset,
+                    sample,
+                    true
+                );
+
+
+                offset += 2;
+            }
+
+
+            return new Blob(
+                [buffer],
+                {
+                    type: "audio/wav"
+                }
+            );
+        }
+
+
+        /* =========================================================
+           WRITE STRING TO WAV HEADER
+        ========================================================= */
+
+        function writeString(
+            view,
+            offset,
+            string
+        ) {
+
+            for (
+                let i = 0;
+                i < string.length;
+                i++
+            ) {
+
+                view.setUint8(
+                    offset + i,
+                    string.charCodeAt(i)
+                );
+            }
+        }
+
+
+        /* =========================================================
+           DRAW MEL-SPECTROGRAM
+        ========================================================= */
+
+        function drawSpec(
+            base64,
+            shape
+        ) {
+
+            const bytes =
+                Uint8Array.from(
+                    atob(base64),
+                    character =>
+                        character.charCodeAt(0)
+                );
+
+
+            const height = shape[0];
+
+            const width = shape[1];
+
+            const canvas = $("spec");
+
+            const dpr =
+                window.devicePixelRatio || 1;
+
+
+            canvas.width =
+                width * dpr;
+
+            canvas.height =
+                height * dpr;
+
+
+            const context =
+                canvas.getContext("2d");
+
+
+            const image =
+                context.createImageData(
+                    width,
+                    height
+                );
+
+
+            for (
+                let i = 0;
+                i < bytes.length;
+                i++
+            ) {
+
+                const value =
+                    bytes[i] / 255;
+
+
+                image.data[i * 4] =
+                    Math.floor(
+                        255 * value
+                    );
+
+
+                image.data[i * 4 + 1] =
+                    Math.floor(
+                        255 *
+                        Math.sqrt(value)
+                    );
+
+
+                image.data[i * 4 + 2] =
+                    Math.floor(
+                        255 *
+                        (1 - value)
+                    );
+
+
+                image.data[i * 4 + 3] =
+                    255;
+            }
+
+
+            context.putImageData(
+                image,
+                0,
+                0
+            );
+        }
+
+
+        /* =========================================================
+           ANALYZE AUDIO
+        ========================================================= */
+
+        $("analyze").onclick =
+            async () => {
+
+                if (!currentFile) {
+
+                    $("error").textContent =
+                        "Choose or record an audio file first.";
+
+                    return;
+                }
+
+
+                $("error").textContent = "";
+
+
+                $("analyze").disabled =
+                    true;
+
+
+                $("prediction").textContent =
+                    "…";
+
+
+                $("prediction").style.color =
+                    "";
+
+
+                $("confidence").textContent =
+                    "Extracting features and running CNN";
+
+
+                setStatus(
+                    "Analyzing audio…"
+                );
+
+
+                try {
+
+                    /*
+                     * Always send the CURRENT file.
+                     *
+                     * This is important because
+                     * recorded audio is also stored
+                     * in currentFile.
+                     */
+
+                    const formData =
+                        new FormData();
+
+
+                    formData.append(
+                        "file",
+                        currentFile,
+                        currentFile.name
+                    );
+
+
+                    const response =
+                        await fetch(
+                            API +
+                            "/api/analyze?nocache=" +
+                            Date.now(),
+                            {
+                                method: "POST",
+
+                                body: formData,
+
+                                cache: "no-store"
+                            }
+                        );
+
+
+                    const data =
+                        await response.json();
+
+
+                    if (!response.ok) {
+
+                        throw new Error(
+                            data.detail ||
+                            "Analysis failed."
+                        );
+                    }
+
+
+                    /* =================================================
+                       PREDICTION
+                    ================================================== */
+
+                    $("prediction")
+                        .textContent =
+                        data.prediction;
+
+
+                    $("prediction")
+                        .style.color =
+                        data.prediction === "SPOOF"
+                            ? "var(--bad)"
+                            : "var(--good)";
+
+
+                    /* =================================================
+                       CONFIDENCE
+                    ================================================== */
+
+                    $("confidence")
+                        .textContent =
+                        `${data.confidence.toFixed(2)}% model confidence`;
+
+
+                    $("confidenceFill")
+                        .style.width =
+                        data.confidence + "%";
+
+
+                    /* =================================================
+                       PROBABILITIES
+                    ================================================== */
+
+                    $("bonafide")
+                        .textContent =
+                        data.bonafide_probability
+                            .toFixed(1) + "%";
+
+
+                    $("spoof")
+                        .textContent =
+                        data.spoof_probability
+                            .toFixed(1) + "%";
+
+
+                    $("bonafideBar")
+                        .style.width =
+                        data.bonafide_probability +
+                        "%";
+
+
+                    $("spoofBar")
+                        .style.width =
+                        data.spoof_probability +
+                        "%";
+
+
+                    /* =================================================
+                       DURATION
+                    ================================================== */
+
+                    $("duration")
+                        .textContent =
+                        fmt(data.duration);
+
+
+                    /* =================================================
+                       SPECTROGRAM
+                    ================================================== */
+
+                    $("specwrap")
+                        .style.display =
+                        "block";
+
+
+                    drawSpec(
+                        data.spectrogram,
+                        data.spectrogram_shape
+                    );
+
+
+                    /* =================================================
+                       LOW CONFIDENCE
+                    ================================================== */
+
+                    const confidenceGap =
+                        Math.abs(
+                            data.spoof_probability -
+                            data.bonafide_probability
+                        );
+
+
+                    if (confidenceGap < 20) {
+
+                        $("confidence")
+                            .textContent +=
+                            " · Low-confidence prediction";
+                    }
+
+
+                    setStatus(
+                        "Analysis complete"
+                    );
+
+                } catch (error) {
+
+                    $("prediction")
+                        .textContent =
+                        "ERROR";
+
+
+                    $("prediction")
+                        .style.color =
+                        "";
+
+
+                    $("confidence")
+                        .textContent =
+                        error.message;
+
+
+                    $("error")
+                        .textContent =
+                        error.message;
+
+
+                    setStatus(
+                        "Analysis failed"
+                    );
+
+                } finally {
+
+                    $("analyze")
+                        .disabled =
+                        false;
+                }
+            };
+
+
+        /* =========================================================
+           RESIZE
+        ========================================================= */
+
+        window.onresize =
+            drawWaveform;
+
+    </script>
+
+</body>
+
+</html>
